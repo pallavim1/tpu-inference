@@ -12,7 +12,19 @@ This document presents a 1:1 "apples-to-apples" comparative benchmark between **
 
 ---
 
-## 2. Direct 1:1 Side-by-Side Benchmark Results
+## 2. Load Generator Parity Assessment vs. PANW Methodology
+
+| Component | PANW's Environment | Our TPU Load Generator (`tpu_panw_rps_benchmark.py`) | Parity Status |
+| :--- | :--- | :--- | :--- |
+| **Load Tooling** | `k6` script sending HTTP requests | Python `asyncio` + `aiohttp` sending HTTP requests | **Parity Achieved** (Both issue async HTTP POSTs) |
+| **Target Endpoint** | REST API Endpoint (`/v1/embeddings`) | vLLM OpenAI REST API (`http://localhost:8000/v1/embeddings`) | **Exact Match** |
+| **Payload Sizes** | 1K, 2K, 5K, 7K bytes (50 to 7,000 chars) | Exact 1K (1,024B), 2K (2,048B), 5K (5,120B), 7K (7,168B) payloads | **Exact Match** |
+| **Target Rates** | **Average**: 20 RPS<br>**Peak**: 40 RPS | Tested across 1, 5, 7, 10, 20, 30, and 40 RPS steps | **Exact Match** |
+| **SLA Validation** | **Avg SLA**: p99 < 50ms @ 20 RPS<br>**Peak SLA**: p99 < 100ms @ 40 RPS | **TPU v6e Actuals**:<br>• 20 RPS (7K): **p99 = 15.56 ms** (Passes SLA ✅)<br>• 40 RPS (7K): **p99 = 14.72 ms** (Passes SLA ✅) | **Exceeds SLA Requirements** |
+
+---
+
+## 3. Direct 1:1 Side-by-Side Benchmark Results
 
 ### 1K Payload (~1,024 Bytes / ~200 Tokens)
 
@@ -70,7 +82,7 @@ This document presents a 1:1 "apples-to-apples" comparative benchmark between **
 
 ---
 
-## 3. Methodology & Server Setup
+## 4. Methodology & Server Setup
 
 ### TPU v6e Test Setup:
 ```bash
