@@ -8,7 +8,7 @@ runner with no KV cache; mean pooling executes in vLLM's CPU pooler.
 ## 1. Code
 
 ```bash
-git clone https://github.com/shivajid/tpu-inference.git
+git clone https://github.com/pallavim1/tpu-inference.git
 cd tpu-inference
 git checkout jina-v2-embeddings-clean
 ```
