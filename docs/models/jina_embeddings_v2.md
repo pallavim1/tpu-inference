@@ -89,6 +89,31 @@ curl localhost:8000/v1/embeddings -H 'Content-Type: application/json' \
 
 Expect a 512-dimensional embedding.
 
+## 7. Benchmarking (PANW Online Inference RPS Harness)
+
+To measure online inference RPS (Requests Per Second) and latency distributions across variable payload sizes (1K, 2K, 5K, and 7K bytes) under production-like load:
+
+1. **Start the serving endpoint** (with max context length e.g. 2048):
+   ```bash
+   vllm serve jinaai/jina-embeddings-v2-small-en \
+       --runner pooling \
+       --convert embed \
+       --trust-remote-code \
+       --max-model-len 2048 \
+       --dtype float32 \
+       --host 0.0.0.0 \
+       --port 8000
+   ```
+
+2. **Run the RPS benchmark script** in a separate terminal:
+   ```bash
+   python scripts/tpu_panw_rps_benchmark.py
+   ```
+
+The harness issues asynchronous HTTP requests across 28 load scenarios (1K–7K payloads at 1, 5, 7, 10, 20, 30, and 40 RPS steps) and logs min, p50, avg, p90, p95, and p99 response times. Results are saved to `tpu_panw_rps_results.json`.
+
+For detailed 3-way comparative benchmark analysis across PANW GPU baseline, Cloud TPU v6e, and Cloud TPU v5e, see [PANW GPU vs. TPU v6e & TPU v5e Analysis](panw_gpu_vs_tpu_v6e_v5e_analysis.md).
+
 ## Known limitations / follow-ups
 
 - `max_model_len` capped at 1024–2048 for now: the dense ALiBi bias tensor is
