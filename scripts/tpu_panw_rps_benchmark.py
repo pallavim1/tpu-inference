@@ -18,6 +18,10 @@ PAYLOAD_SIZES = {
     "7K": 7168
 }
 
+payload_filter = os.environ.get("PAYLOAD_FILTER")
+if payload_filter:
+    PAYLOAD_SIZES = {k: v for k, v in PAYLOAD_SIZES.items() if k.upper() == payload_filter.upper()}
+
 TARGET_RPS_LIST = [1, 5, 7, 10, 20, 30, 40]
 TEST_DURATION_SEC = 12
 
