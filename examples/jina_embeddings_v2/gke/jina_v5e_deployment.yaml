@@ -1,0 +1,189 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hf-secret
+  namespace: default
+type: Opaque
+stringData:
+  HF_TOKEN: "<YOUR_HF_TOKEN>"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jina-adapter-script
+  namespace: default
+data:
+  proxy.py: |
+    import asyncio
+    import aiohttp
+    from aiohttp import web
+    import sys
+
+    VLLM_URL = "http://127.0.0.1:8001"
+    MODEL_NAME = "jinaai/jina-embeddings-v2-small-en"
+
+    async def init_app():
+        app = web.Application()
+        session = aiohttp.ClientSession(
+            connector=aiohttp.TCPConnector(limit=1000, limit_per_host=1000, keepalive_timeout=60)
+        )
+        app["session"] = session
+
+        async def handle_prompt(request):
+            try:
+                data = await request.json()
+                text_input = data.get("text", "")
+                payload = {
+                    "model": MODEL_NAME,
+                    "input": text_input,
+                    "truncate_prompt_tokens": 2048
+                }
+                async with app["session"].post(f"{VLLM_URL}/v1/embeddings", json=payload) as resp:
+                    resp_json = await resp.json()
+                    return web.json_response(resp_json, status=resp.status)
+            except Exception as e:
+                return web.json_response({"error": str(e)}, status=500)
+
+        async def handle_health(request):
+            return web.json_response({"status": "ok"})
+
+        async def cleanup(app):
+            await app["session"].close()
+
+        app.router.add_post("/prompt_c2", handle_prompt)
+        app.router.add_post("/mcp_c2", handle_prompt)
+        app.router.add_get("/health", handle_health)
+        app.router.add_get("/healthz", handle_health)
+        app.on_cleanup.append(cleanup)
+        return app
+
+    if __name__ == "__main__":
+        port = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
+        print(f"Starting PANW Async Adapter Proxy on port {port} -> forwarding to {VLLM_URL}")
+        web.run_app(init_app(), host="0.0.0.0", port=port)
+  
+  entrypoint.sh: |
+    #!/bin/bash
+    set -e
+    echo "=== [1/5] Installing git and essential build tools ==="
+    apt-get update && apt-get install -y git curl build-essential
+
+    echo "=== [2/5] Cloning tpu-inference repo (branch: jina-v2-embeddings-clean) ==="
+    mkdir -p /workspace && cd /workspace
+    if [ ! -d "tpu-inference" ]; then
+        git clone https://github.com/pallavim1/tpu-inference.git
+    fi
+    cd tpu-inference
+    git checkout jina-v2-embeddings-clean
+    git pull origin jina-v2-embeddings-clean
+
+    echo "=== [3/5] Installing vllm-tpu stack and editable repo overlay ==="
+    python3 -m pip install --upgrade pip
+    python3 -m pip install vllm-tpu==0.26.0
+    python3 -m pip install -e .
+    python3 -m pip install onnxruntime transformers openpyxl aiohttp
+
+    echo "=== [4/5] Applying Jina environment patches ==="
+    python3 scripts/setup_jina_env.py
+
+    echo "=== [5/5] Starting PANW Async Adapter Proxy on port 8000 ==="
+    python3 /config/proxy.py 8000 &
+
+    echo "=== [6/6] Launching vLLM Jina Embeddings Server on internal port 8001 ==="
+    exec vllm serve jinaai/jina-embeddings-v2-small-en \
+        --runner pooling \
+        --convert embed \
+        --trust-remote-code \
+        --max-model-len 2048 \
+        --dtype float32 \
+        --host 127.0.0.1 \
+        --port 8001
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jina-embeddings-v2-tpu
+  namespace: default
+  labels:
+    app: jina-embeddings-v2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jina-embeddings-v2
+  template:
+    metadata:
+      labels:
+        app: jina-embeddings-v2
+    spec:
+      nodeSelector:
+        cloud.google.com/gke-nodepool: pm-panw-jina-tpu-pool
+        cloud.google.com/gke-tpu-accelerator: tpu-v5-lite-podslice
+        cloud.google.com/gke-tpu-topology: 1x1
+      tolerations:
+      - key: "google.com/tpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+      containers:
+      - name: jina-vllm-server
+        image: python:3.12-slim
+        command: ["/bin/bash", "/config/entrypoint.sh"]
+        env:
+        - name: HF_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: hf-secret
+              key: HF_TOKEN
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: OMP_NUM_THREADS
+          value: "16"
+        resources:
+          requests:
+            google.com/tpu: "1"
+            cpu: "8"
+            memory: "20Gi"
+          limits:
+            google.com/tpu: "1"
+            cpu: "16"
+            memory: "36Gi"
+        ports:
+        - containerPort: 8000
+          name: http-serving
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: config-vol
+          mountPath: /config
+        - name: dshm
+          mountPath: /dev/shm
+      volumes:
+      - name: config-vol
+        configMap:
+          name: jina-adapter-script
+          defaultMode: 0755
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 8Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jina-embedding-service
+  namespace: default
+  labels:
+    app: jina-embeddings-v2
+spec:
+  type: ClusterIP
+  selector:
+    app: jina-embeddings-v2
+  ports:
+  - name: http-serving
+    port: 8000
+    targetPort: 8000

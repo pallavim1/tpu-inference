@@ -1,0 +1,26 @@
+     ✓ prompt_c2 http 200
+
+     checks.........................: 100.00% ✓ 2403      ✗ 0   
+     data_received..................: 27 MB   201 kB/s
+     data_sent......................: 9.7 MB  72 kB/s
+   ✓ error_rate.....................: 0.00%   ✓ 0         ✗ 2403
+     http_req_blocked...............: min=2.98µs  med=4.98µs  avg=14.58µs p(90)=8.3µs   p(95)=14.13µs  p(99)=168.11µs max=7.02ms   count=2403
+     http_req_connecting............: min=0s      med=0s      avg=7.23µs  p(90)=0s      p(95)=0s       p(99)=111.67µs max=6.97ms   count=2403
+   ✓ http_req_duration..............: min=10.99ms med=20.17ms avg=18.7ms  p(90)=23.76ms p(95)=24.18ms  p(99)=24.87ms  max=31.65ms  count=2403
+       { expected_response:true }...: min=10.99ms med=20.17ms avg=18.7ms  p(90)=23.76ms p(95)=24.18ms  p(99)=24.87ms  max=31.65ms  count=2403
+     http_req_failed................: 0.00%   ✓ 0         ✗ 2403
+     http_req_receiving.............: min=30.11µs med=66.46µs avg=70.12µs p(90)=96.33µs p(95)=108.74µs p(99)=132.72µs max=2.39ms   count=2403
+     http_req_sending...............: min=15.38µs med=59.7µs  avg=55.95µs p(90)=94.22µs p(95)=106.04µs p(99)=192.06µs max=636.17µs count=2403
+     http_req_tls_handshaking.......: min=0s      med=0s      avg=0s      p(90)=0s      p(95)=0s       p(99)=0s       max=0s       count=2403
+     http_req_waiting...............: min=10.9ms  med=20.02ms avg=18.57ms p(90)=23.58ms p(95)=23.98ms  p(99)=24.68ms  max=31.44ms  count=2403
+     http_reqs......................: 2403    17.795138/s
+     iteration_duration.............: min=12.2ms  med=25.68ms avg=24.87ms p(90)=36.79ms p(95)=37.6ms   p(99)=38.76ms  max=44.83ms  count=2403
+     iterations.....................: 2403    17.795138/s
+   ✓ mcp_c2_latency_ms..............: min=0s      med=0s      avg=0s      p(90)=0s      p(95)=0s       p(99)=0s       max=0s       count=0   
+   ✓ prompt_c2_latency_ms...........: min=10.99ms med=20.17ms avg=18.7ms  p(90)=23.76ms p(95)=24.18ms  p(99)=24.87ms  max=31.65ms  count=2403
+     prompt_c2_requests.............: 2403    17.795138/s
+     vus............................: 1       min=0       max=1 
+     vus_max........................: 80      min=80      max=80
+── Throughput ──────────────────────────────────────────────────
+  prompt_c2       2403 reqs in 480s active  →  5.01 RPS
+────────────────────────────────────────────────────────────────

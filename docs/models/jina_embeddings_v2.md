@@ -112,7 +112,25 @@ To measure online inference RPS (Requests Per Second) and latency distributions 
 
 The harness issues asynchronous HTTP requests across 28 load scenarios (1K–7K payloads at 1, 5, 7, 10, 20, 30, and 40 RPS steps) and logs min, p50, avg, p90, p95, and p99 response times. Results are saved to `tpu_panw_rps_results.json`.
 
-For detailed 3-way comparative benchmark analysis across PANW GPU baseline, Cloud TPU v6e, and Cloud TPU v5e, see [PANW GPU vs. TPU v6e & TPU v5e Analysis](panw_gpu_vs_tpu_v6e_v5e_analysis.md).
+## 8. GKE Deployment & PANW k6 Load Testing
+
+To run Jina Embeddings v2 on Google Kubernetes Engine (GKE) with Cloud TPU v5e:
+
+1. **Deploy to GKE**:
+   Manifests and provisioning scripts are located in [`examples/jina_embeddings_v2/gke/`](../../examples/jina_embeddings_v2/gke/):
+   ```bash
+   cd examples/jina_embeddings_v2/gke/
+   ./cluster_setup.sh
+   ```
+
+2. **Run PANW k6 Load Test Suite**:
+   The k6 script and result analyzer are located in [`benchmarks/panw_k6/`](../../benchmarks/panw_k6/):
+   ```bash
+   cd benchmarks/panw_k6/
+   ./run_benchmark.sh
+   ```
+
+For detailed methodology, latency percentiles across 1K–7K payloads at 20–40 RPS, and comparison against NVIDIA L4 GPU baselines, see [PANW k6 GKE Benchmark Report](panw_k6_gke_benchmark_report.md).
 
 ## Known limitations / follow-ups
 
@@ -122,3 +140,4 @@ For detailed 3-way comparative benchmark analysis across PANW GPU baseline, Clou
 - TP=1 (model is ~33M params); slopes already shard with heads for TP > 1.
 - The sitecustomize hook is a workaround; an upstream vLLM registration hook
   in the API-server process would remove it.
+
