@@ -61,13 +61,22 @@ The **Jina Embeddings v2 Small** model (`jinaai/jina-embeddings-v2-small-en`) ha
 
 ## 3. Generated Files & Artifacts
 
-All benchmark raw data, structured JSON summaries, and formatted Excel reports have been exported:
+All benchmark manifests, scripts, structured JSON summaries, and formatted Excel reports are available in the repository:
 
-| File | Description |
-| :--- | :--- |
-| [`raw_scenario_summary.xlsx`](file:///usr/local/google/home/pallaviam/panw-benchmark/results/raw_scenario_summary.xlsx) | Excel workbook containing per-scenario latency percentiles and charts (20 RPS) |
-| [`raw_scenario_summary.json`](file:///usr/local/google/home/pallaviam/panw-benchmark/results/raw_scenario_summary.json) | Full structured JSON summary of 20 RPS run |
-| [`raw_40rps_scenario_summary.xlsx`](file:///usr/local/google/home/pallaviam/panw-benchmark/results/raw_40rps_scenario_summary.xlsx) | Excel workbook containing per-scenario latency percentiles and charts (40 RPS) |
-| [`raw_40rps_scenario_summary.json`](file:///usr/local/google/home/pallaviam/panw-benchmark/results/raw_40rps_scenario_summary.json) | Full structured JSON summary of 40 RPS run |
-| [`raw.ndjson`](file:///usr/local/google/home/pallaviam/panw-benchmark/results/raw.ndjson) | Raw k6 per-request timing points (20 RPS) |
-| [`raw_40rps.ndjson`](file:///usr/local/google/home/pallaviam/panw-benchmark/results/raw_40rps.ndjson) | Raw k6 per-request timing points (40 RPS) |
+### Benchmark Data & Summaries
+| File | GitHub Link | Relative Path | Description |
+| :--- | :--- | :--- | :--- |
+| **Excel (20 RPS)** | [Download `raw_scenario_summary.xlsx`](https://github.com/pallavim1/tpu-inference/raw/jina-v2-embeddings-clean/benchmarks/panw_k6/results/raw_scenario_summary.xlsx) | [`benchmarks/panw_k6/results/raw_scenario_summary.xlsx`](../../benchmarks/panw_k6/results/raw_scenario_summary.xlsx) | Formatted Excel workbook with 20 RPS latency percentiles & charts |
+| **JSON (20 RPS)** | [`raw_scenario_summary.json`](https://github.com/pallavim1/tpu-inference/blob/jina-v2-embeddings-clean/benchmarks/panw_k6/results/raw_scenario_summary.json) | [`benchmarks/panw_k6/results/raw_scenario_summary.json`](../../benchmarks/panw_k6/results/raw_scenario_summary.json) | Structured per-scenario JSON summary (20 RPS) |
+| **Excel (40 RPS)** | [Download `raw_40rps_scenario_summary.xlsx`](https://github.com/pallavim1/tpu-inference/raw/jina-v2-embeddings-clean/benchmarks/panw_k6/results/raw_40rps_scenario_summary.xlsx) | [`benchmarks/panw_k6/results/raw_40rps_scenario_summary.xlsx`](../../benchmarks/panw_k6/results/raw_40rps_scenario_summary.xlsx) | Formatted Excel workbook with 40 RPS latency percentiles & charts |
+| **JSON (40 RPS)** | [`raw_40rps_scenario_summary.json`](https://github.com/pallavim1/tpu-inference/blob/jina-v2-embeddings-clean/benchmarks/panw_k6/results/raw_40rps_scenario_summary.json) | [`benchmarks/panw_k6/results/raw_40rps_scenario_summary.json`](../../benchmarks/panw_k6/results/raw_40rps_scenario_summary.json) | Structured per-scenario JSON summary (40 RPS) |
+
+### Manifests & Benchmark Tooling
+| File | GitHub Link | Relative Path | Description |
+| :--- | :--- | :--- | :--- |
+| **GKE Manifest** | [`jina_v5e_deployment.yaml`](https://github.com/pallavim1/tpu-inference/blob/jina-v2-embeddings-clean/examples/jina_embeddings_v2/gke/jina_v5e_deployment.yaml) | [`examples/jina_embeddings_v2/gke/jina_v5e_deployment.yaml`](../../examples/jina_embeddings_v2/gke/jina_v5e_deployment.yaml) | GKE Deployment, Async Adapter Proxy ConfigMap, Service & Secret |
+| **Cluster Setup** | [`cluster_setup.sh`](https://github.com/pallavim1/tpu-inference/blob/jina-v2-embeddings-clean/examples/jina_embeddings_v2/gke/cluster_setup.sh) | [`examples/jina_embeddings_v2/gke/cluster_setup.sh`](../../examples/jina_embeddings_v2/gke/cluster_setup.sh) | Automated VPC, Subnet, GKE cluster & TPU v5e node pool provisioning |
+| **k6 Suite** | [`k6_ray_serve_test.js`](https://github.com/pallavim1/tpu-inference/blob/jina-v2-embeddings-clean/benchmarks/panw_k6/k6_ray_serve_test.js) | [`benchmarks/panw_k6/k6_ray_serve_test.js`](../../benchmarks/panw_k6/k6_ray_serve_test.js) | PANW k6 load test script (fixed payload sizes, RPS sweeps) |
+| **Result Analyzer** | [`analyze_k6_results.py`](https://github.com/pallavim1/tpu-inference/blob/jina-v2-embeddings-clean/benchmarks/panw_k6/analyze_k6_results.py) | [`benchmarks/panw_k6/analyze_k6_results.py`](../../benchmarks/panw_k6/analyze_k6_results.py) | NDJSON parser, percentiles calculator & Excel generator |
+| **Benchmark Runner** | [`run_benchmark.sh`](https://github.com/pallavim1/tpu-inference/blob/jina-v2-embeddings-clean/benchmarks/panw_k6/run_benchmark.sh) | [`benchmarks/panw_k6/run_benchmark.sh`](../../benchmarks/panw_k6/run_benchmark.sh) | End-to-end benchmark execution and result extraction script |
+
