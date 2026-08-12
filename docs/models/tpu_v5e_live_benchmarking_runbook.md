@@ -172,3 +172,31 @@ for pid_dir in os.listdir("/proc"):
 | **2 KB (2048 B)** | Standard Prompts | ~400 Tokens | **90 RPS** | **28.9 ms** | **95 RPS** (P99 = 363.8 ms) | **4.5x Margin** | **2.25x Margin** |
 | **5 KB (5120 B)** | Large Context | ~1,000 Tokens | **80 RPS** | **49.5 ms** | **90 RPS** (P99 = 2,094.6 ms) | **4.0x Margin** | **2.0x Margin** |
 | **7 KB (7168 B)** | Max Sequence Length | ~1,400 Tokens | **60 RPS** | **41.8 ms** | **70 RPS** (P99 = 59.4 ms) | **3.0x Margin** | **1.5x Margin** |
+
+---
+
+## 8. Running Benchmarks from Dedicated CPU Node Pool (Inter-Node / Cluster Network)
+
+To evaluate real-world client-to-server traffic over the GKE cluster network, benchmarks can be executed from the dedicated CPU node pool (**`cpu-benchmark-pool`**, `n2-standard-8`) targeting the TPU v5e Service (`http://jina-embedding-service:8000/prompt_c2`):
+
+### Step 1: Exec into the CPU Benchmark Runner Pod
+```bash
+kubectl exec -it cpu-benchmark-runner -- bash
+```
+
+### Step 2: Launch the Full Saturation Suite in Background
+```bash
+cd /workspace
+nohup python3 -u /workspace/run_cpu_to_tpu_saturation.py --phase all --duration 60s > /workspace/cpu_to_tpu_benchmark_60s.log 2>&1 &
+```
+
+### Step 3: Stream Live Progress & Latency Tables
+```bash
+tail -f /workspace/cpu_to_tpu_benchmark_60s.log
+```
+
+### Step 4: Copy Results Locally
+```bash
+mkdir -p /usr/local/google/home/pallaviam/panw-benchmark/cpu_to_tpu_live_results_60s
+kubectl cp cpu-benchmark-runner:/workspace/cpu_to_tpu_results /usr/local/google/home/pallaviam/panw-benchmark/cpu_to_tpu_live_results_60s
+```
