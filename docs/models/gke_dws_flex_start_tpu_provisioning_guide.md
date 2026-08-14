@@ -125,9 +125,9 @@ gcloud container node-pools create "$TPU_POOL_NAME" \
 
 ---
 
-## 6. Step 4: Verify Node Pool Status
+## 6. Step 4: Verify Node Pool Status (Acquired & Ready)
 
-Verify that the node pool is successfully created and active in GKE:
+Verify that the node pool is active in GKE:
 
 ```bash
 gcloud container node-pools describe "$TPU_POOL_NAME" \
@@ -136,7 +136,7 @@ gcloud container node-pools describe "$TPU_POOL_NAME" \
     --project="$PROJECT_ID"
 ```
 
-*Expected Output:*
+*Expected Status Output:*
 ```yaml
 autoscaling:
   enabled: true
@@ -152,23 +152,68 @@ status: RUNNING
 
 ## 7. Next Steps: Targeting the DWS Flex Node Pool
 
-Your GKE cluster is now equipped with an active DWS Flex-Start TPU v5e node pool. 
+According to the official [GKE DWS Flex-Start documentation](https://docs.cloud.google.com/kubernetes-engine/docs/how-to/dws-flex-start-training), GKE automatically tags Flex-Start nodes with the standard label `cloud.google.com/gke-flex-start: "true"`.
 
-To schedule any containerized TPU workload onto this pool, ensure your Kubernetes pod/deployment manifest includes:
+To target and trigger node acquisition on this pool, include the canonical `nodeSelector` and TPU `tolerations` in your manifest:
+
+### Option A: Serving / Inference (Kubernetes Deployment)
 
 ```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tpu-v5e-flex-serving
+  namespace: default
 spec:
-  nodeSelector:
-    cloud.google.com/gke-nodepool: tpu-v5e-dws-flex-pool
-  tolerations:
-  - key: "google.com/tpu"
-    operator: "Exists"
-    effect: "NoSchedule"
-  containers:
-  - name: my-tpu-app
-    resources:
-      limits:
-        google.com/tpu: "1"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tpu-v5e-flex-serving
+  template:
+    metadata:
+      labels:
+        app: tpu-v5e-flex-serving
+    spec:
+      nodeSelector:
+        cloud.google.com/gke-flex-start: "true"
+        cloud.google.com/gke-nodepool: tpu-v5e-dws-flex-pool
+      tolerations:
+      - key: "google.com/tpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+      containers:
+      - name: tpu-app
+        image: <YOUR_CONTAINER_IMAGE>
+        resources:
+          limits:
+            google.com/tpu: "1"
 ```
 
-When this manifest is submitted, GKE will automatically queue the request, acquire the TPU v5e instance via DWS Flex-Start, and execute the container.
+### Option B: Batch Training / Evaluation (Kubernetes Job)
+
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: tpu-v5e-flex-job
+  namespace: default
+spec:
+  template:
+    spec:
+      nodeSelector:
+        cloud.google.com/gke-flex-start: "true"
+        cloud.google.com/gke-nodepool: tpu-v5e-dws-flex-pool
+      tolerations:
+      - key: "google.com/tpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+      restartPolicy: OnFailure
+      containers:
+      - name: tpu-trainer
+        image: <YOUR_CONTAINER_IMAGE>
+        resources:
+          limits:
+            google.com/tpu: "1"
+```
+
+When either manifest is submitted, GKE will automatically queue the request, acquire the TPU v5e instance via DWS Flex-Start, and launch your container.
