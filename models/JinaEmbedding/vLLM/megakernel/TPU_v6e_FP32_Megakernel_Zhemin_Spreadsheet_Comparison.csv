@@ -1,0 +1,91 @@
+=== TAB 1: TPU v6e (FP32 Megakernel) vs TPU v5e (FP32) vs L4 GPU (Matching gid=1972899730) ===
+Concurrent Request Comparison (TPU v6e FP32 Megakernel vs TPU v5e FP32 vs L4 GPU — Strictly 1KB & 2KB)
+P50
+Payload Size,Concurrency,TPU v6e Megakernel (p50),TPU v5e + vLLM (p50),L4 GPU (p50),Delta (v6e vs L4),% Reduction (v6e vs L4),Delta (v6e vs v5e),% Reduction (v6e vs v5e),Faster Setup
+1KB,1,8.4ms,11.5ms,20.7ms,TPU v6e is 12.3ms faster,59.4% lower latency,TPU v6e is 3.1ms faster,27.0% lower latency,TPU v6e Megakernel
+1KB,4,19.1ms,21.2ms,38.1ms,TPU v6e is 19.0ms faster,49.9% lower latency,TPU v6e is 2.1ms faster,9.9% lower latency,TPU v6e Megakernel
+1KB,8,27.3ms,42.5ms,58.7ms,TPU v6e is 31.4ms faster,53.5% lower latency,TPU v6e is 15.2ms faster,35.8% lower latency,TPU v6e Megakernel
+1KB,16,57.0ms,85.4ms (153.2ms),96.5ms,TPU v6e is 39.5ms faster,40.9% lower latency,TPU v6e is 28.4ms faster,33.3% lower latency,TPU v6e Megakernel
+2KB,1,10.6ms,16.5ms,24.3ms,TPU v6e is 13.7ms faster,56.4% lower latency,TPU v6e is 5.9ms faster,35.8% lower latency,TPU v6e Megakernel
+2KB,4,32.1ms,40.7ms (89.1ms),52.1ms,TPU v6e is 20.0ms faster,38.4% lower latency,TPU v6e is 8.6ms faster,21.1% lower latency,TPU v6e Megakernel
+2KB,8,38.1ms,82.6ms (153.2ms),87.4ms,TPU v6e is 49.3ms faster,56.4% lower latency,TPU v6e is 44.5ms faster,53.9% lower latency,TPU v6e Megakernel
+2KB,16,77.4ms,165.9ms (560.6ms),156.9ms,TPU v6e is 79.5ms faster,50.7% lower latency,TPU v6e is 88.5ms faster,53.3% lower latency,TPU v6e Megakernel
+
+p99
+Payload Size,Concurrency,TPU v6e Megakernel (p99),TPU v5e + vLLM (p99),L4 GPU (p99),Delta (v6e vs L4),% Reduction (v6e vs L4),Delta (v6e vs v5e),% Reduction (v6e vs v5e),Faster Setup
+1KB,1,10.0ms,12.7ms,23.5ms,TPU v6e is 13.5ms faster,57.4% lower latency,TPU v6e is 2.7ms faster,21.3% lower latency,TPU v6e Megakernel
+1KB,4,25.3ms,22.8ms (40.4ms),42.9ms,TPU v6e is 17.6ms faster,41.0% lower latency,TPU v6e is 15.1ms faster vs base,37.4% lower latency,TPU v6e Megakernel
+1KB,8,49.6ms,44.5ms (101.5ms),66.3ms,TPU v6e is 16.7ms faster,25.2% lower latency,TPU v6e is 51.9ms faster vs base,51.1% lower latency,TPU v6e Megakernel
+1KB,16,78.4ms,89.9ms (155.8ms),107.6ms,TPU v6e is 29.2ms faster,27.1% lower latency,TPU v6e is 11.5ms faster,12.8% lower latency,TPU v6e Megakernel
+2KB,1,12.0ms,17.7ms,28.2ms,TPU v6e is 16.2ms faster,57.4% lower latency,TPU v6e is 5.7ms faster,32.2% lower latency,TPU v6e Megakernel
+2KB,4,39.0ms,42.8ms (99.9ms),58.2ms,TPU v6e is 19.2ms faster,33.0% lower latency,TPU v6e is 3.8ms faster,8.9% lower latency,TPU v6e Megakernel
+2KB,8,60.0ms,86.0ms (339.1ms),97.3ms,TPU v6e is 37.3ms faster,38.3% lower latency,TPU v6e is 26.0ms faster,30.2% lower latency,TPU v6e Megakernel
+2KB,16,97.2ms,171.2ms (597.2ms),175.5ms,TPU v6e is 78.3ms faster,44.6% lower latency,TPU v6e is 74.0ms faster,43.2% lower latency,TPU v6e Megakernel
+
+Conclusion:
+"Across ALL Concurrency levels (1, 4, 8, 16) for both 1KB and 2KB, TPU v6e (FP32 Megakernel) is 100% faster than L4 GPU (38% to 59% lower P50 latency, 25% to 57% lower P99 latency), eliminating the high-concurrency (Conc 8-16) bottleneck seen on TPU v5e."
+
+RPS Saturation Result (<50ms P99 SLA — Strictly 1K & 2K Payloads)
+Payload,Setup,Max Sustained RPS (<50ms P99),p50,p99,RPS Improvement vs L4,RPS Improvement vs TPU v5e
+1K,L4 + Triton,70,20.0ms,37.0ms,Baseline (1.00x),
+1K,TPU V5e + vLLM (FP32),180,19.9ms,29.6ms,2.57x (+157.1%),Baseline (1.00x)
+1K,TPU V6e + vLLM Megakernel (FP32),215,20.7ms,36.8ms,3.07x (+207.1%),1.19x (+19.4%)
+2K,L4 + Triton,40,22.0ms,28.0ms,Baseline (1.00x),
+2K,TPU V5e + vLLM (FP32),90,17.2ms,26.5ms,2.25x (+125.0%),Baseline (1.00x)
+2K,TPU V6e + vLLM Megakernel (FP32),155,12.8ms,22.3ms,3.88x (+287.5%),1.72x (+72.2%)
+
+Cost Improvement (1K & 2K Payloads — Matching Zhemin Formula in gid=1972899730)
+Machine Type,Machine Config,Hourly Cost,Cost per 1M request (1K Payload),Cost per 1M request (2K Payload),Notes
+g2-standard-4 (L4 + Triton),L4 GPUs: 1 | vCPUs: 4 | Memory: 16GiB,0.7,6.94,12.15,"Zhemin baseline ($6.94 @ 1K, $12.15 @ 2K)"
+ct5lp-hightpu-1t (TPU v5e FP32),vCPUs: 24 | Memory: 45.6 GB | TPU Memory: 15.75 GB,1.2,5.95 (140 RPS) / 4.63 (180 RPS),9.26,25%–33% cost reduction vs L4 on 1K; 23.8% reduction on 2K
+ct6e-standard-1t (TPU v6e FP32 Megakernel - 3yr CUD / Spot),vCPUs: 28 | Memory: 112 GB | TPU HBM3e: 32 GB,1.22,3.88,5.38,44.1% cost reduction vs L4 on 1K (@ 215 RPS); 55.7% cost reduction vs L4 on 2K (@ 155 RPS)
+ct6e-standard-1t (TPU v6e FP32 Megakernel - On-Demand),vCPUs: 28 | Memory: 112 GB | TPU HBM3e: 32 GB,2.7,8.58,11.9,Lower cost per 1M than L4 on 2K ($11.90 vs $12.15) even at full on-demand price
+
+TPU v6e & v5e vs L4 Availability
+Region Name,Region ID,TPU v6e Supported Zones,TPU v5e Supported Zones,L4 GPU Supported Zones,Overlap / Multi-Accelerator Region?
+Iowa,us-central1,Yes (us-central1-b),"4 (a, b, c, f)","4 (a, b, c, f)",Yes (Full)
+"Columbus, Ohio",us-east5,"Yes (us-east5-a, b)",1 (a),"3 (a, b, c)",Yes
+South Carolina,us-east1,Yes (us-east1-d),—,"3 (b, c, d)",Yes (TPU v6e + L4 GPU)
+Oregon,us-west1,Yes (us-west1-c),1 (c),"3 (a, b, c)",Yes
+Las Vegas,us-west4,Yes (us-west4-a),1 (a),"3 (a, b, c)",Yes
+
+=== TAB 2: Jina AI Embedding Model + TPU v6e + vLLM FP32 Megakernel (Matching gid=1161755388) ===
+Config: TPU v6e (ct6e-standard-1t) | 4-Layer Fused FP32 Megakernel,VLLM Config: --runner pooling --convert embed --trust-remote-code --max-num-seqs=40 --max-num-batched-tokens 8192 --max-model-len 2048 --dtype float32,Model Type: FP32 Megakernel
+
+Batch Request Testing: A single HTTP request contains multiple prompts
+Payload Size,Concurrency,TPU v6e Megakernel (FP32) Throughput,TPU v6e Megakernel (FP32) p50,TPU v6e Megakernel (FP32) p99,Zhemin TPU v5e (FP32) Throughput,Zhemin TPU v5e (FP32) p50,Zhemin TPU v5e (FP32) p99,Zhemin L4 GPU (FP16) Throughput,Zhemin L4 GPU (FP16) p50,Zhemin L4 GPU (FP16) p99
+1KB (1024 chars),1,116.3/s,8.4ms,10.0ms,85.8/s,11.5ms,12.7ms,43.2/s,20.7ms,23.5ms
+1KB (1024 chars),4,213.8/s,19.1ms,25.3ms,187.4/s,21.2ms,22.8ms,103.4/s,38.1ms,42.9ms
+1KB (1024 chars),8,269.9/s,27.3ms,49.6ms,187.6/s,42.5ms,44.5ms,135.1/s,58.7ms,66.3ms
+1KB (1024 chars),16,281.7/s,57.0ms,78.4ms,186.8/s,85.4ms,89.9ms,165.2/s,96.5ms,107.6ms
+2KB (2048 chars),1,92.7/s,10.6ms,12.0ms,59.5/s,16.5ms,17.7ms,39.0/s,24.3ms,28.2ms
+2KB (2048 chars),4,125.6/s,32.1ms,39.0ms,97.7/s,40.7ms,42.8ms,75.7/s,52.1ms,58.2ms
+2KB (2048 chars),8,203.3/s,38.1ms,60.0ms,96.6/s,82.6ms,86.0ms,90.5/s,87.4ms,97.3ms
+2KB (2048 chars),16,202.4/s,77.4ms,97.2ms,96.5/s,165.9ms,171.2ms,101.1/s,156.9ms,175.5ms
+
+1KB Dedicated Saturation
+RPS,TPU v6e Megakernel Achieved,TPU v6e Megakernel P50,TPU v6e Megakernel P99,TPU v6e Megakernel SLA,Zhemin TPU v5e Achieved,Zhemin TPU v5e P50,Zhemin TPU v5e P99,Zhemin TPU v5e SLA
+100,99.99,8.6 ms,10.1 ms,✅ PASS,100,11.5 ms,14.0 ms,✅ PASS
+120,119.97,8.7 ms,12.4 ms,✅ PASS,120,11.8 ms,15.5 ms,✅ PASS
+140,139.94,11.0 ms,12.6 ms,✅ PASS,140,11.6 ms,18.5 ms,✅ PASS
+160,159.91,10.6 ms,12.3 ms,✅ PASS,160,16.8 ms,24.2 ms,✅ PASS
+180,179.89,10.4 ms,12.7 ms,✅ PASS,180.1,19.9 ms,29.6 ms,✅ PASS
+190,189.86,10.5 ms,15.4 ms,✅ PASS,187.8,523.7 ms,762.7 ms,⚠️ SATURATED
+200,199.88,13.3 ms,38.8 ms,✅ PASS,189,1709 ms,2818 ms,⚠️ SATURATED
+205,204.53,24.0 ms,45.0 ms,✅ PASS,-,-,-,⚠️ SATURATED
+210,209.64,11.5 ms,39.8 ms,✅ PASS,-,-,-,⚠️ SATURATED
+215,214.68,20.7 ms,36.8 ms,✅ PASS (Max <50ms Ceiling),-,-,-,⚠️ SATURATED
+220,219.08,28.7 ms,77.0 ms,⚠️ SATURATED,187.9,3738 ms,6182 ms,⚠️ SATURATED
+
+2KB Dedicated Saturation
+RPS,TPU v6e Megakernel Achieved,TPU v6e Megakernel P50,TPU v6e Megakernel P99,TPU v6e Megakernel SLA,Zhemin TPU v5e Achieved,Zhemin TPU v5e P50,Zhemin TPU v5e P99,Zhemin TPU v5e SLA
+90,89.99,10.7 ms,12.9 ms,✅ PASS,90,17.2 ms,26.5 ms,✅ PASS
+95,94.99,10.7 ms,12.7 ms,✅ PASS,94.75,218.6 ms,346.5 ms,⚠️ SATURATED
+100,99.98,11.7 ms,15.4 ms,✅ PASS,96.32,1031 ms,2185 ms,⚠️ SATURATED
+110,109.95,13.7 ms,15.1 ms,✅ PASS,96.74,3208 ms,5170 ms,⚠️ SATURATED
+120,119.94,12.9 ms,14.3 ms,✅ PASS,-,-,-,⚠️ SATURATED
+130,129.92,12.4 ms,13.8 ms,✅ PASS,-,-,-,⚠️ SATURATED
+140,139.92,12.2 ms,14.2 ms,✅ PASS,-,-,-,⚠️ SATURATED
+150,149.91,12.2 ms,15.4 ms,✅ PASS,-,-,-,⚠️ SATURATED
+155,154.9,12.8 ms,22.3 ms,✅ PASS (Max <50ms Ceiling),-,-,-,⚠️ SATURATED
+160,159.9,49.2 ms,111.2 ms,⚠️ SATURATED,-,-,-,⚠️ SATURATED

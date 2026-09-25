@@ -1,0 +1,322 @@
+{
+  "accelerator": "Google Cloud TPU v6e (ct6e-standard-1t) with 4-Layer Fused FP32 Megakernel (jina_v6e_4layer_megakernel)",
+  "vllm_config": "vllm serve jinaai/jina-embeddings-v2-small-en --runner pooling --convert embed --trust-remote-code --max-model-len 2048 --dtype float32 --max-num-seqs 40 --max-num-batched-tokens 8192",
+  "payload_definition": "Random characters: 1KB (1,024 chars \u2248 1,009 tokens) and 2KB (2,048 chars \u2248 2,016 tokens). Strictly 1KB & 2KB only.",
+  "batch_request_testing": [
+    {
+      "payload_size": "1KB (1024 chars)",
+      "concurrency": 1,
+      "tpu_v6e_megakernel_tput": "116.3/s",
+      "tpu_v6e_megakernel_p50": "8.4ms",
+      "tpu_v6e_megakernel_p99": "10.0ms",
+      "zhemin_tpu_v5e_tput": "85.8/s",
+      "zhemin_tpu_v5e_p50": "11.5ms",
+      "zhemin_tpu_v5e_p99": "12.7ms"
+    },
+    {
+      "payload_size": "1KB (1024 chars)",
+      "concurrency": 4,
+      "tpu_v6e_megakernel_tput": "213.8/s",
+      "tpu_v6e_megakernel_p50": "19.1ms",
+      "tpu_v6e_megakernel_p99": "25.3ms",
+      "zhemin_tpu_v5e_tput": "187.4/s",
+      "zhemin_tpu_v5e_p50": "21.2ms",
+      "zhemin_tpu_v5e_p99": "22.8ms"
+    },
+    {
+      "payload_size": "1KB (1024 chars)",
+      "concurrency": 8,
+      "tpu_v6e_megakernel_tput": "269.9/s",
+      "tpu_v6e_megakernel_p50": "27.3ms",
+      "tpu_v6e_megakernel_p99": "49.6ms",
+      "zhemin_tpu_v5e_tput": "187.6/s",
+      "zhemin_tpu_v5e_p50": "42.5ms",
+      "zhemin_tpu_v5e_p99": "44.5ms"
+    },
+    {
+      "payload_size": "1KB (1024 chars)",
+      "concurrency": 16,
+      "tpu_v6e_megakernel_tput": "281.7/s",
+      "tpu_v6e_megakernel_p50": "57.0ms",
+      "tpu_v6e_megakernel_p99": "78.4ms",
+      "zhemin_tpu_v5e_tput": "186.8/s",
+      "zhemin_tpu_v5e_p50": "85.4ms",
+      "zhemin_tpu_v5e_p99": "89.9ms"
+    },
+    {
+      "payload_size": "2KB (2048 chars)",
+      "concurrency": 1,
+      "tpu_v6e_megakernel_tput": "92.7/s",
+      "tpu_v6e_megakernel_p50": "10.6ms",
+      "tpu_v6e_megakernel_p99": "12.0ms",
+      "zhemin_tpu_v5e_tput": "59.5/s",
+      "zhemin_tpu_v5e_p50": "16.5ms",
+      "zhemin_tpu_v5e_p99": "17.7ms"
+    },
+    {
+      "payload_size": "2KB (2048 chars)",
+      "concurrency": 4,
+      "tpu_v6e_megakernel_tput": "125.6/s",
+      "tpu_v6e_megakernel_p50": "32.1ms",
+      "tpu_v6e_megakernel_p99": "39.0ms",
+      "zhemin_tpu_v5e_tput": "97.7/s",
+      "zhemin_tpu_v5e_p50": "40.7ms",
+      "zhemin_tpu_v5e_p99": "42.8ms"
+    },
+    {
+      "payload_size": "2KB (2048 chars)",
+      "concurrency": 8,
+      "tpu_v6e_megakernel_tput": "203.3/s",
+      "tpu_v6e_megakernel_p50": "38.1ms",
+      "tpu_v6e_megakernel_p99": "60.0ms",
+      "zhemin_tpu_v5e_tput": "96.6/s",
+      "zhemin_tpu_v5e_p50": "82.6ms",
+      "zhemin_tpu_v5e_p99": "86.0ms"
+    },
+    {
+      "payload_size": "2KB (2048 chars)",
+      "concurrency": 16,
+      "tpu_v6e_megakernel_tput": "202.4/s",
+      "tpu_v6e_megakernel_p50": "77.4ms",
+      "tpu_v6e_megakernel_p99": "97.2ms",
+      "zhemin_tpu_v5e_tput": "96.5/s",
+      "zhemin_tpu_v5e_p50": "165.9ms",
+      "zhemin_tpu_v5e_p99": "171.2ms"
+    }
+  ],
+  "1kb_dedicated_saturation": [
+    {
+      "rps": 100,
+      "achieved": 99.99,
+      "p50": "8.6 ms",
+      "p99": "10.1 ms",
+      "sla": "\u2705 PASS",
+      "zhemin_achieved": 100,
+      "zhemin_p50": "11.5 ms",
+      "zhemin_p99": "14.0 ms",
+      "zhemin_sla": "\u2705 PASS"
+    },
+    {
+      "rps": 120,
+      "achieved": 119.97,
+      "p50": "8.7 ms",
+      "p99": "12.4 ms",
+      "sla": "\u2705 PASS",
+      "zhemin_achieved": 120,
+      "zhemin_p50": "11.8 ms",
+      "zhemin_p99": "15.5 ms",
+      "zhemin_sla": "\u2705 PASS"
+    },
+    {
+      "rps": 140,
+      "achieved": 139.94,
+      "p50": "11.0 ms",
+      "p99": "12.6 ms",
+      "sla": "\u2705 PASS",
+      "zhemin_achieved": 140,
+      "zhemin_p50": "11.6 ms",
+      "zhemin_p99": "18.5 ms",
+      "zhemin_sla": "\u2705 PASS"
+    },
+    {
+      "rps": 160,
+      "achieved": 159.91,
+      "p50": "10.6 ms",
+      "p99": "12.3 ms",
+      "sla": "\u2705 PASS",
+      "zhemin_achieved": 160,
+      "zhemin_p50": "16.8 ms",
+      "zhemin_p99": "24.2 ms",
+      "zhemin_sla": "\u2705 PASS"
+    },
+    {
+      "rps": 180,
+      "achieved": 179.89,
+      "p50": "10.4 ms",
+      "p99": "12.7 ms",
+      "sla": "\u2705 PASS",
+      "zhemin_achieved": 180.1,
+      "zhemin_p50": "19.9 ms",
+      "zhemin_p99": "29.6 ms",
+      "zhemin_sla": "\u2705 PASS"
+    },
+    {
+      "rps": 190,
+      "achieved": 189.86,
+      "p50": "10.5 ms",
+      "p99": "15.4 ms",
+      "sla": "\u2705 PASS",
+      "zhemin_achieved": 187.8,
+      "zhemin_p50": "523.7 ms",
+      "zhemin_p99": "762.7 ms",
+      "zhemin_sla": "\u26a0\ufe0f SATURATED"
+    },
+    {
+      "rps": 200,
+      "achieved": 199.88,
+      "p50": "13.3 ms",
+      "p99": "38.8 ms",
+      "sla": "\u2705 PASS",
+      "zhemin_achieved": 189,
+      "zhemin_p50": "1709 ms",
+      "zhemin_p99": "2818 ms",
+      "zhemin_sla": "\u26a0\ufe0f SATURATED"
+    },
+    {
+      "rps": 205,
+      "achieved": 204.53,
+      "p50": "24.0 ms",
+      "p99": "45.0 ms",
+      "sla": "\u2705 PASS",
+      "zhemin_achieved": "-",
+      "zhemin_p50": "-",
+      "zhemin_p99": "-",
+      "zhemin_sla": "\u26a0\ufe0f SATURATED"
+    },
+    {
+      "rps": 210,
+      "achieved": 209.64,
+      "p50": "11.5 ms",
+      "p99": "39.8 ms",
+      "sla": "\u2705 PASS",
+      "zhemin_achieved": "-",
+      "zhemin_p50": "-",
+      "zhemin_p99": "-",
+      "zhemin_sla": "\u26a0\ufe0f SATURATED"
+    },
+    {
+      "rps": 215,
+      "achieved": 214.68,
+      "p50": "20.7 ms",
+      "p99": "36.8 ms",
+      "sla": "\u2705 PASS (Max <50ms Ceiling)",
+      "zhemin_achieved": "-",
+      "zhemin_p50": "-",
+      "zhemin_p99": "-",
+      "zhemin_sla": "\u26a0\ufe0f SATURATED"
+    },
+    {
+      "rps": 220,
+      "achieved": 219.08,
+      "p50": "28.7 ms",
+      "p99": "77.0 ms",
+      "sla": "\u26a0\ufe0f SATURATED",
+      "zhemin_achieved": 187.9,
+      "zhemin_p50": "3738 ms",
+      "zhemin_p99": "6182 ms",
+      "zhemin_sla": "\u26a0\ufe0f SATURATED"
+    }
+  ],
+  "2kb_dedicated_saturation": [
+    {
+      "rps": 90,
+      "achieved": 89.99,
+      "p50": "10.7 ms",
+      "p99": "12.9 ms",
+      "sla": "\u2705 PASS",
+      "zhemin_achieved": 90,
+      "zhemin_p50": "17.2 ms",
+      "zhemin_p99": "26.5 ms",
+      "zhemin_sla": "\u2705 PASS"
+    },
+    {
+      "rps": 95,
+      "achieved": 94.99,
+      "p50": "10.7 ms",
+      "p99": "12.7 ms",
+      "sla": "\u2705 PASS",
+      "zhemin_achieved": 94.75,
+      "zhemin_p50": "218.6 ms",
+      "zhemin_p99": "346.5 ms",
+      "zhemin_sla": "\u26a0\ufe0f SATURATED"
+    },
+    {
+      "rps": 100,
+      "achieved": 99.98,
+      "p50": "11.7 ms",
+      "p99": "15.4 ms",
+      "sla": "\u2705 PASS",
+      "zhemin_achieved": 96.32,
+      "zhemin_p50": "1031 ms",
+      "zhemin_p99": "2185 ms",
+      "zhemin_sla": "\u26a0\ufe0f SATURATED"
+    },
+    {
+      "rps": 110,
+      "achieved": 109.95,
+      "p50": "13.7 ms",
+      "p99": "15.1 ms",
+      "sla": "\u2705 PASS",
+      "zhemin_achieved": 96.74,
+      "zhemin_p50": "3208 ms",
+      "zhemin_p99": "5170 ms",
+      "zhemin_sla": "\u26a0\ufe0f SATURATED"
+    },
+    {
+      "rps": 120,
+      "achieved": 119.94,
+      "p50": "12.9 ms",
+      "p99": "14.3 ms",
+      "sla": "\u2705 PASS",
+      "zhemin_achieved": "-",
+      "zhemin_p50": "-",
+      "zhemin_p99": "-",
+      "zhemin_sla": "\u26a0\ufe0f SATURATED"
+    },
+    {
+      "rps": 130,
+      "achieved": 129.92,
+      "p50": "12.4 ms",
+      "p99": "13.8 ms",
+      "sla": "\u2705 PASS",
+      "zhemin_achieved": "-",
+      "zhemin_p50": "-",
+      "zhemin_p99": "-",
+      "zhemin_sla": "\u26a0\ufe0f SATURATED"
+    },
+    {
+      "rps": 140,
+      "achieved": 139.92,
+      "p50": "12.2 ms",
+      "p99": "14.2 ms",
+      "sla": "\u2705 PASS",
+      "zhemin_achieved": "-",
+      "zhemin_p50": "-",
+      "zhemin_p99": "-",
+      "zhemin_sla": "\u26a0\ufe0f SATURATED"
+    },
+    {
+      "rps": 150,
+      "achieved": 149.91,
+      "p50": "12.2 ms",
+      "p99": "15.4 ms",
+      "sla": "\u2705 PASS",
+      "zhemin_achieved": "-",
+      "zhemin_p50": "-",
+      "zhemin_p99": "-",
+      "zhemin_sla": "\u26a0\ufe0f SATURATED"
+    },
+    {
+      "rps": 155,
+      "achieved": 154.9,
+      "p50": "12.8 ms",
+      "p99": "22.3 ms",
+      "sla": "\u2705 PASS (Max <50ms Ceiling)",
+      "zhemin_achieved": "-",
+      "zhemin_p50": "-",
+      "zhemin_p99": "-",
+      "zhemin_sla": "\u26a0\ufe0f SATURATED"
+    },
+    {
+      "rps": 160,
+      "achieved": 159.9,
+      "p50": "49.2 ms",
+      "p99": "111.2 ms",
+      "sla": "\u26a0\ufe0f SATURATED",
+      "zhemin_achieved": "-",
+      "zhemin_p50": "-",
+      "zhemin_p99": "-",
+      "zhemin_sla": "\u26a0\ufe0f SATURATED"
+    }
+  ]
+}
