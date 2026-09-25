@@ -17,14 +17,14 @@
 Strictly enforces `MAX_MODEL_LEN = 2048` (never compiling or padding above 2,048 tokens)
 on the `jina-v2-embeddings-clean` branch.
 
-Key Fusions Across All 4 JinaBert Encoder Layers:
+Key Optimizations Across All 4 JinaBert Encoder Layers:
 1. Strict `MAX_MODEL_LEN = 2048` Enforcement (`q_len <= 2048`).
-2. Single-Pass Pre-Layer-0 Padding, SegmentIds, and Symmetric ALiBi Bias (`ab`) Construction:
-   - Eliminates 3x redundant `ab` (`[1, N, T, T]`) and `SegmentIds` computation across Layers 1-3.
-   - Uses hardware DMA for `ab` inside VMEM-resident `_flash_attention_kernel_single_batch_single_step`
-     instead of per-tile VPU `iota` synthesis.
-3. Head-First QKV & Output Contractions (`einsum("td,dcnh->cnth")` and `einsum("nth,nhd->td")`)
-   with `lax.Precision.HIGHEST` (IEEE FP32).
+2. Compile-Time Precomputed Symmetric ALiBi Bias (`ab`) & Single-Pass `SegmentIds`:
+   - `ab` (`[1, N_local, padded_len, padded_len]`) is precomputed per bucket (`<= 2048`)
+     with zero runtime VPU `abs`/`iota` calculation on forward steps.
+   - `SegmentIds` is constructed once before Layer 0 and shared across all 4 layers.
+3. Native 1-Pass `FP32`-Accumulated MXU Projections (`lax.Precision.DEFAULT`, matching
+   `tpu_inference`'s `JaxEinsum`/`JaxLinear`) for Head-First `QKV`, `O`, `GeGLU`, and `WO`.
 4. Fused Single-Reduction FP32 LayerNorm (`E[x]` and `E[x^2]` in one pass) and GeGLU MLP
    inside a single `jax.shard_map` + `lax.scan` 4-layer loop.
 """
@@ -96,20 +96,6 @@ def _build_segment_ids_once(
     return SegmentIds(q=padded_seg_2d, kv=padded_seg_2d)
 
 
-def _build_alibi_bias_once(
-    alibi_slopes: jax.Array,
-    padded_len: int,
-    sm_scale: float,
-) -> jax.Array:
-    """Constructs `[1, N_local, padded_len, padded_len]` symmetric ALiBi bias ONCE before Layer 0."""
-    pos = jnp.arange(padded_len, dtype=jnp.int32)
-    distance = jnp.abs(pos[:, None] - pos[None, :])
-    alibi = -alibi_slopes.astype(jnp.float32)[:, None, None] * (
-        distance.astype(jnp.float32)[None, :, :] / sm_scale
-    )
-    return jnp.expand_dims(alibi, axis=0)
-
-
 def _select_v6e_block_sizes_2048(padded_len: int) -> BlockSizes:
     """Selects optimal TPU v6e VMEM block sizes for `padded_len <= 2048` (`MAX_MODEL_LEN = 2048`)."""
     if padded_len <= 128:
@@ -119,8 +105,6 @@ def _select_v6e_block_sizes_2048(padded_len: int) -> BlockSizes:
     else:
         block_q = 512
 
-    # For padded_len <= 2048, the entire KV sequence + ALiBi bias tile (~11 MB total)
-    # fits inside TPU v6e's 32 MB VMEM in a single step!
     block_k = padded_len
 
     return BlockSizes(
@@ -149,7 +133,7 @@ def jina_v6e_4layer_megakernel(
     b_down: jax.Array,             # [4, D]
     ln2_scale: jax.Array,          # [4, D]
     ln2_bias: jax.Array,           # [4, D]
-    alibi_slopes: jax.Array,       # [N]
+    ab_full: jax.Array,            # [1, N, 2048, 2048] precomputed ALiBi bias in HBM
     mesh: Mesh,
     sm_scale: float,
     layer_norm_eps: float = 1e-12,
@@ -176,7 +160,7 @@ def jina_v6e_4layer_megakernel(
         P(None, None),                     # b_down: [4, D]
         P(None, None),                     # ln2_scale: [4, D]
         P(None, None),                     # ln2_bias: [4, D]
-        P("model"),                        # alibi_slopes: [N]
+        P(None, "model", None, None),      # ab_full: [1, N, 2048, 2048]
     )
     out_specs = P(None, None)
 
@@ -194,7 +178,7 @@ def jina_v6e_4layer_megakernel(
         b_down_in,
         ln2_s_in,
         ln2_b_in,
-        alibi_in,
+        ab_full_in,
     ):
         q_len = x_in.shape[0]
         align_quantum = 512 if q_len > 256 else (256 if q_len > 128 else 128)
@@ -207,9 +191,9 @@ def jina_v6e_4layer_megakernel(
         else:
             x_pad = x_in
 
-        # 2. Build SegmentIds and Symmetric ALiBi bias (`ab`) ONCE before Layer 0
+        # 2. Build SegmentIds ONCE and slice precomputed ALiBi bias (`ab`) ONCE before Layer 0
         segment_ids = _build_segment_ids_once(seq_lens_in, q_len, padded_len)
-        ab = _build_alibi_bias_once(alibi_in, padded_len, sm_scale)
+        ab = ab_full_in[:, :, :padded_len, :padded_len]
         block_sizes = _select_v6e_block_sizes_2048(padded_len)
 
         layer_weights = (
@@ -242,12 +226,13 @@ def jina_v6e_4layer_megakernel(
             ) = weights_l
 
             # Step A: Fused QKV Projection directly into Head-First [3, N_local, T_pad, H]
+            # Uses native 1-pass MXU systolic pass with FP32 accumulation (matching JaxEinsum)
             qkv = (
                 jnp.einsum(
                     "td,dcnh->cnth",
                     x_curr,
                     wqkv_l,
-                    precision=lax.Precision.HIGHEST,
+                    preferred_element_type=jnp.float32,
                 )
                 + bqkv_l[:, :, None, :]
             )
@@ -255,7 +240,7 @@ def jina_v6e_4layer_megakernel(
             k_bhtd = qkv[1:2]
             v_bhtd = qkv[2:3]
 
-            # Step B: Single-Step VMEM-Resident Pallas FlashAttention (32 MB VMEM, shared `ab`)
+            # Step B: Single-Step VMEM-Resident Pallas FlashAttention (32 MB VMEM, precomputed `ab`)
             attn_bhtd = _flash_attention(
                 q_bhtd,
                 k_bhtd,
@@ -276,7 +261,7 @@ def jina_v6e_4layer_megakernel(
                     "nth,nhd->td",
                     attn_bhtd[0],
                     wo_l,
-                    precision=lax.Precision.HIGHEST,
+                    preferred_element_type=jnp.float32,
                 )
                 + bo_l
             )
@@ -291,7 +276,7 @@ def jina_v6e_4layer_megakernel(
             h_gated_full = jnp.dot(
                 x_mid,
                 wgated_l,
-                precision=lax.Precision.HIGHEST,
+                preferred_element_type=jnp.float32,
             )
             half_dim = h_gated_full.shape[-1] // 2
             gated = h_gated_full[..., :half_dim]
@@ -301,7 +286,7 @@ def jina_v6e_4layer_megakernel(
                 jnp.dot(
                     h_act,
                     wdown_l,
-                    precision=lax.Precision.HIGHEST,
+                    preferred_element_type=jnp.float32,
                 )
                 + bdown_l
             )
@@ -336,5 +321,5 @@ def jina_v6e_4layer_megakernel(
         b_down,
         ln2_scale,
         ln2_bias,
-        alibi_slopes,
+        ab_full,
     )
