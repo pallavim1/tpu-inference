@@ -23,7 +23,7 @@ from typing import List, Optional, Tuple
 import jax
 import jax.numpy as jnp
 from flax import nnx
-from jax.sharding import Mesh, NamedSharding, PartitionSpec as P
+from jax.sharding import Mesh
 from vllm.config import VllmConfig
 
 from tpu_inference import utils
@@ -307,21 +307,7 @@ class JinaBertEncoder(JaxModule):
         ])
         first_self = getattr(self.layer[0].attention, "self")
         self.sm_scale = float(first_self.head_dim_original**-0.5)
-        self.alibi_slopes = first_self.alibi_slopes
-
-        # Precompute [1, num_heads, 2048, 2048] symmetric ALiBi bias ONCE at init time
-        slopes_arr = jnp.asarray(self.alibi_slopes, dtype=jnp.float32)
-        pos = jnp.arange(MAX_MODEL_LEN, dtype=jnp.int32)
-        distance = jnp.abs(pos[:, None] - pos[None, :]).astype(jnp.float32)
-        ab_2048 = jnp.expand_dims(
-            -slopes_arr[:, None, None] * (distance[None, :, :] / self.sm_scale),
-            axis=0,
-        )
-        ab_sharded = jax.device_put(
-            ab_2048,
-            NamedSharding(mesh, P(None, "model", None, None)),
-        )
-        self.ab_full = nnx.Variable(ab_sharded)
+        self.alibi_slopes = tuple(first_self.alibi_slopes)
 
     def __call__(self, x: jax.Array,
                  attention_metadata: AttentionMetadata) -> jax.Array:
@@ -383,9 +369,9 @@ class JinaBertEncoder(JaxModule):
             b_down=b_down,
             ln2_scale=ln2_scale,
             ln2_bias=ln2_bias,
-            ab_full=self.ab_full.value,
             mesh=self.mesh,
             sm_scale=self.sm_scale,
+            alibi_slopes=self.alibi_slopes,
             layer_norm_eps=self.layer_norm_eps,
         )
 
