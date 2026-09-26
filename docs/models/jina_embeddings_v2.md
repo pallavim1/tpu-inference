@@ -62,23 +62,36 @@ process — needed because the API-server process validates ModelConfig before
 ```bash
 pytest tests/models/jax/test_jina_bert.py -v -rs   # parity vs official ONNX export; expect 3 passed
 pytest tests/e2e/test_jina_embeddings.py -v -rs    # full engine path
+pytest tests/models/jax/test_jina_bert_megakernel.py -v -rs -s  # vs XLA path
+pytest tests/kernels/jina_bert_megakernel_test.py -v -rs  # vs dense reference
 ```
 
 The parity test compares per-token hidden states and mean-pooled embeddings
 against the model repo's official ONNX export (same weights, float32, no
-remote code) and requires cosine similarity > 0.999.
+remote code) and requires cosine similarity > 0.999. The megakernel tests
+compare the encoder megakernel against the per-layer XLA path and a dense
+reference (see the kernel README).
 
 ## 6. Serve
 
 ```bash
 vllm serve jinaai/jina-embeddings-v2-small-en --runner pooling --convert embed \
-  --trust-remote-code --max-model-len 1024 --dtype float32
+  --trust-remote-code --max-model-len 2048 --max-num-batched-tokens 2048 \
+  --dtype float32
 ```
 
 `--convert embed` is required: vLLM classifies the `JinaBertForMaskedLM`
 architecture string as masked-LM and gates the embeddings API otherwise. No
 pooler flag is needed — vLLM auto-detects mean pooling from the repo's
 sentence-transformers configuration.
+
+The encoder runs as one Pallas megakernel by default
+(`tpu_inference/kernels/jina_bert_megakernel/README.md`). It accepts at most
+2048 tokens per step, hence `--max-num-batched-tokens 2048`.
+`USE_JINA_BERT_MEGAKERNEL=0` selects the per-layer XLA path.
+`JINA_BERT_MEGAKERNEL_PRECISION=highest` selects full-fp32 matmuls; the
+default feeds bf16 operands to the MXU with fp32 accumulation, as the XLA
+path does.
 
 Query:
 
@@ -91,8 +104,10 @@ Expect a 512-dimensional embedding.
 
 ## Known limitations / follow-ups
 
-- `max_model_len` capped at 1024–2048 for now: the dense ALiBi bias tensor is
-  O(heads × T²); the full 8192 context wants kernel-side bias computation.
+- At most 2048 tokens per step (so `max_model_len` <= 2048): the megakernel
+  keeps the whole step in VMEM and raises on longer steps, and the per-layer
+  path's dense ALiBi bias tensor is O(heads × T²). The full 8192 context
+  needs a different kernel design.
 - float32 only (validated); bf16 pending validation against the fp32 baseline.
 - TP=1 (model is ~33M params); slopes already shard with heads for TP > 1.
 - The sitecustomize hook is a workaround; an upstream vLLM registration hook
