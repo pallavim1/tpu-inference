@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: jina-opus-v6e-test
+  labels:
+    app: jina-opus-v6e-test
+spec:
+  nodeSelector:
+    cloud.google.com/gke-tpu-accelerator: tpu-v6e-slice
+    cloud.google.com/gke-tpu-topology: 1x1
+  tolerations:
+  - key: "google.com/tpu"
+    operator: "Exists"
+    effect: "NoSchedule"
+  containers:
+  - name: vllm-tpu
+    image: vllm/vllm-tpu:latest
+    command: ["sleep", "infinity"]
+    ports:
+    - containerPort: 8000
+    - containerPort: 8001
+    resources:
+      requests:
+        google.com/tpu: "1"
+      limits:
+        google.com/tpu: "1"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: panw-v6e-benchmark-runner
+  labels:
+    app: panw-v6e-benchmark-runner
+spec:
+  containers:
+  - name: runner
+    image: python:3.11-slim
+    command: ["sleep", "infinity"]

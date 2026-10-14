@@ -351,8 +351,11 @@ def main():
     p.add_argument("--out-dir", default=None, help="Output directory for JSON results and logs")
     p.add_argument("--duration", default="60s", help="Duration per saturation RPS step (default: 60s)")
     p.add_argument("--phase", default="all", choices=["all", "1k", "2k"], help="Which saturation payload tier(s) to run")
-    p.add_argument("--saturation-only", action="store_true", help="Skip Single-HTTP Batch and k6 Concurrency; run only Dedicated Saturation")
-    p.add_argument("--knee-only", action="store_true", help="Run only the high-RPS saturation knee steps (480..550 RPS for 1K, 280..370 RPS for 2K)")
+    p.add_argument("--test-case", default="all", choices=["all", "1", "2", "3"], help="Run all 3 test cases ('all'), Test Case 1 ('1' = Batch N=1,4,8,16), Test Case 2 ('2' = k6 Concurrent VUS=1,4,8,16), or Test Case 3 ('3' = Dedicated RPS Saturation)")
+    p.add_argument("--batch-only", action="store_true", help="Run only Test Case 1 (Single-HTTP Batch N=1,4,8,16)")
+    p.add_argument("--concurrency-only", action="store_true", help="Run only Test Case 2 (k6 Concurrent VUS=1,4,8,16)")
+    p.add_argument("--saturation-only", action="store_true", help="Run only Test Case 3 (Dedicated Open-Loop RPS Saturation)")
+    p.add_argument("--knee-only", action="store_true", help="Run only Test Case 3 around the high-RPS saturation knee (480..550 RPS for 1K, 280..370 RPS for 2K)")
     p.add_argument("--steps", default=None, help="Custom comma-separated RPS steps for a single --phase (e.g. --phase 1k --steps 500,510,520,530,540)")
     args = p.parse_args()
 
@@ -442,26 +445,57 @@ def main():
     }
     save_state(out_dir, state)
 
-    if not args.saturation_only and not args.knee_only:
+    run_tc1 = (
+        args.batch_only
+        or (
+            args.test_case in ("all", "1")
+            and not args.concurrency_only
+            and not args.saturation_only
+            and not args.knee_only
+        )
+    )
+    run_tc2 = (
+        args.concurrency_only
+        or (
+            args.test_case in ("all", "2")
+            and not args.batch_only
+            and not args.saturation_only
+            and not args.knee_only
+        )
+    )
+    run_tc3 = (
+        args.saturation_only
+        or args.knee_only
+        or (
+            args.test_case in ("all", "3")
+            and not args.batch_only
+            and not args.concurrency_only
+        )
+    )
+
+    if run_tc1:
         loaded_pools = {}
         for kb, (path, tok, lbl) in pools_map.items():
             with open(path) as f:
                 loaded_pools[kb] = (json.load(f), tok, lbl)
         run_single_http_batch_suite(args.base_url, args.metrics_url, out_dir, loaded_pools, state)
+
+    if run_tc2:
         run_k6_concurrency_suite(args.base_url, args.metrics_url, out_dir, pools_map, state)
 
-    for key in active_tiers:
-        t = tiers[key]
-        log(f"=== Dedicated Saturation: {t['label']} ({args.duration} per step) ===")
-        run_saturation_step(args.base_url, args.metrics_url, out_dir, t, t["warmup_rps"], "30s", f"warmup_{key}", "warmup")
-        saturated_in_a_row = 0
-        for rps in t["steps"]:
-            row = run_saturation_step(args.base_url, args.metrics_url, out_dir, t, rps, args.duration, f"{key}_fp32", "sweep")
-            state[f"saturation_{key}"].append(row)
-            save_state(out_dir, state)
-            saturated_in_a_row = saturated_in_a_row + 1 if row.get("status") != "PASS" else 0
-            if saturated_in_a_row >= t["max_consecutive_saturated"]:
-                break
+    if run_tc3:
+        for key in active_tiers:
+            t = tiers[key]
+            log(f"=== Dedicated Saturation: {t['label']} ({args.duration} per step) ===")
+            run_saturation_step(args.base_url, args.metrics_url, out_dir, t, t["warmup_rps"], "30s", f"warmup_{key}", "warmup")
+            saturated_in_a_row = 0
+            for rps in t["steps"]:
+                row = run_saturation_step(args.base_url, args.metrics_url, out_dir, t, rps, args.duration, f"{key}_fp32", "sweep")
+                state[f"saturation_{key}"].append(row)
+                save_state(out_dir, state)
+                saturated_in_a_row = saturated_in_a_row + 1 if row.get("status") != "PASS" else 0
+                if saturated_in_a_row >= t["max_consecutive_saturated"]:
+                    break
 
     state["meta"]["finished_utc"] = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     save_state(out_dir, state)
