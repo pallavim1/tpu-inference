@@ -219,6 +219,39 @@ A quick probe run first (G5Q: C=1/16/64, same workload) agreed within ~5%: 91.6 
 - With short prompts, decode-only throughput scales to **843 output tok/s at C=64** (peak 990). The 1,024-token-prompt sweep plateaued at ~463 because prefill stalls the running decodes.
 - Decode step time grows with batch: 8.1 ms at bs=1, ~21 ms at 8, ~43 ms at 32, ~71 ms at 64. More concurrent tokens activate more distinct experts out of the 896, so more expert weights are read each step.
 
+### 5.6 Multi-Turn Agentic Benchmark (`inference-perf`, full model, 1 replica)
+
+**Guide preset (G5B, C=8 / 160 requests / seed 15): not feasible on one replica.**
+- The preset's sessions carry 32K–420K-token repository contexts. With this seed, the 8 sessions held ~3.8M tokens of context, versus ~1.6M tokens of KV capacity on one replica (532K in HBM plus the HiCache host tier).
+- Each new turn reused only the 2,944-token shared system prompt; host-tier hits were 0 across all 1,095 prefill batches. So every turn re-prefilled ~400K tokens at ~4.5K tok/s.
+- Only 17 of 160 requests finished in 17 min, which projects to hours. A ~40-min Spot slice can't hold that, so the run was stopped.
+- The guide's own topology runs 2 replicas behind the router, so each replica holds fewer sessions.
+
+**Adapted workload (G5BA): the same harness and the same `conversation_replay` workload as the 12-layer run in Section 6.5.** C=8, 160 requests, seed 42, sessions of 8K–90K tokens. Config: [benchmarks/inference-perf-12l-adapted.yaml](benchmarks/inference-perf-12l-adapted.yaml). Run in attempt #8 with the Spot-adapted config.
+
+| Metric | **Full 93-layer model, 1 replica (16 chips)** | 12-layer model, dummy weights, 3 replicas (Section 6.5) |
+| --- | --- | --- |
+| Success / failures | **160 / 0** in 409.6 s | 160 / 0 in 189 s |
+| Prompt length per request | mean 41,992 · median 44,035 · P90 59,398 · max 68,167 | mean 42,001 · median 44,058 · P90 59,409 · max 68,190 |
+| **Prefix-cache reuse across turns** | **91.3%** (6.14M of 6.72M prompt tokens) | 91.1% |
+| TTFT | mean 3.37 s · **median 1.24 s** · P90 2.56 s · P99 53.3 s | mean 321 ms · median 226 ms · P90 348 ms · P99 2.67 s |
+| TPOT | mean 49.8 ms · median 35.6 ms · P90 51.2 ms | mean 5.33 ms · median 4.47 ms · P90 5.21 ms |
+| Request latency | mean 17.7 s · median 12.9 s · P90 26.6 s | mean 6.98 s · median 5.29 s · P90 12.09 s |
+| Throughput | **16,403 input tok/s** · 84.5 output tok/s · 0.39 req/s | 35,494 input tok/s · 185 output tok/s · 0.85 req/s |
+
+- On the full model, multi-turn sessions of ~42K tokens get the same ~91% prefix reuse as the 12-layer test: the radix cache plus HiCache keep each session's context across turns. Median TTFT is 1.24 s for ~42K-token prompts.
+- The P99 TTFT (53 s) comes from the cold first turn of each session, a full ~20–70K-token prefill queued behind the others.
+- `inference-perf` reported 67 token-count mismatches between its tokenizer and the server; the 12-layer run had 66. This is a harness artifact with the custom Kimi tokenizer.
+
+**Adapted workload at C=16 (G5BA16; 320 requests, seed 43, same as the 12-layer C=16 run): cut short by the Spot preemption at 19:37:40Z.** 261 of 320 requests had completed; the 59 failures were in flight when the slice went away. Over the 261 successes:
+- Prompts: mean 38,580 · median 38,139 · max 79,405 tokens.
+- Prefix-cache reuse: **89.5%**.
+- TTFT: median **2.58 s** · P90 5.61 s · P99 75.0 s.
+- TPOT: median 57.6 ms · P90 100.9 ms.
+- Request latency: median 22.4 s.
+- Throughput: 17,227 input tok/s · 127.6 output tok/s · 0.45 req/s.
+- For reference, the 12-layer C=16 run (3 replicas) had a median TTFT of 244 ms and 1.62 req/s.
+
 - Single-stream decode runs at **~120 tok/s (8.1 ms/token)** on the full 2.8T model.
 - With short (1,024-token) random prompts, throughput above C=1 is prefill-bound. The guide caps prefill at 4,096 tokens and 8 requests per batch, and each prefill batch stalls the running decodes, so TTFT and TPOT grow with concurrency. Long prompts prefill at ~4.4–4.6K tok/s in 4,096-token chunks (G4 increments; the G5B turn-0 prefills logged ~4.57K tok/s). The average rate drops to ~2.7K tok/s over a full 0→477K-token prompt.
 
