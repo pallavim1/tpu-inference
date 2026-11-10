@@ -67,6 +67,8 @@ Visit our [documentation](https://docs.vllm.ai/projects/tpu/en/latest/) to learn
 
 ## Recipes
 
+- **[TPUv7 (Ironwood) Validation Guides](TPUv7/README.md)**
+  - **[Kimi K3.1 Pro (2.8T MoE · 1M Context) on TorchTPU + SGLang + `llm-d`](TPUv7/Kimi-K3.1-Pro/README.md)**
 - [v7x (Ironwood) Recipes](https://github.com/AI-Hypercomputer/tpu-recipes/tree/main/inference/ironwood/vLLM)
 - [v6e (Trillium) Recipes](https://github.com/AI-Hypercomputer/tpu-recipes/tree/main/inference/trillium/vLLM)
 
