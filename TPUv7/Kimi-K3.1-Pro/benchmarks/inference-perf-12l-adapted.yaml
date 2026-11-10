@@ -1,0 +1,108 @@
+# Adapted from guides/models/kimi-k3-1/inference-perf.yaml for the 12-layer replicas (context 131072):
+# same harness, image, router target and conversation_replay workload shape, scaled-down session lengths.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inference-perf-config-12l
+  labels:
+    app: inference-perf-12l
+data:
+  config.yaml: |
+    load:
+      type: concurrent
+      num_workers: 8
+      worker_max_concurrency: 1000
+      request_timeout: 1800
+      stages:
+      - num_requests: 160
+        concurrency_level: 8
+    api:
+      type: completion
+      streaming: true
+    server:
+      type: sglang
+      model_name: moonshotai/Kimi-K3.1-Pro
+      base_url: http://kimi-k3-1-epp
+    tokenizer:
+      pretrained_model_name_or_path: moonshotai/Kimi-K3.1-Pro
+      trust_remote_code: true
+    data:
+      type: conversation_replay
+      conversation_replay:
+        seed: 42
+        max_model_len: 131072
+        num_conversations: 8
+        shared_system_prompt_len: 3000
+        dynamic_system_prompt_len:
+          type: lognormal
+          min: 8000
+          max: 90000
+          mean: 30000
+          std_dev: 20000
+        turns_per_conversation:
+          type: lognormal
+          min: 5
+          max: 30
+          mean: 10
+          std_dev: 5
+        input_tokens_per_turn:
+          type: lognormal
+          min: 100
+          max: 10000
+          mean: 1500
+          std_dev: 1200
+        output_tokens_per_turn:
+          type: lognormal
+          min: 50
+          max: 1024
+          mean: 300
+          std_dev: 300
+        tool_call_latency_sec:
+          type: lognormal
+          min: 1
+          max: 20
+          mean: 5
+          std_dev: 5
+    report:
+      request_lifecycle:
+        summary: true
+        per_stage: true
+        per_request: true
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: inference-perf-12l
+  labels:
+    app: inference-perf-12l
+spec:
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app: inference-perf-12l
+    spec:
+      serviceAccountName: kimi-k3-1-tpu-sglang-sa
+      nodeSelector:
+        cloud.google.com/gke-nodepool: cpu-infra-pool
+      containers:
+        - name: inference-perf
+          image: quay.io/inference-perf/inference-perf:v0.6.0
+          command: ["/bin/sh", "-c"]
+          args: ["cd /tmp && inference-perf --config_file /etc/config/config.yaml; echo INFERENCE_PERF_EXIT=$?; find /tmp -maxdepth 2 -name '*.json' | head -n 50; sleep 7200"]
+          env:
+            - name: RAYON_NUM_THREADS
+              value: "4"
+          resources:
+            requests:
+              cpu: "4"
+              memory: 16Gi
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/config
+              readOnly: true
+      restartPolicy: Never
+      volumes:
+        - name: config-volume
+          configMap:
+            name: inference-perf-config-12l

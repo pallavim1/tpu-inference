@@ -4,6 +4,9 @@ End-to-end validation and deployment guide for running **Moonshot AI's Kimi K3 /
 
 ![Kimi K3.1 Pro Day-0 Deployment Blueprint on llm-d](assets/kimi-k3-1-llmd-day0-blueprint.jpg)
 
+> [!TIP]
+> **Field benchmark results (2026-11-10):** the full 93-layer model was served on a Spot `2x2x4` slice through the llm-d router. It passed the validation gates, including a 477K-token context check, and was benchmarked across throughput sweeps. See [BENCHMARK_RESULTS.md](BENCHMARK_RESULTS.md).
+
 ---
 
 ## Table of Contents
