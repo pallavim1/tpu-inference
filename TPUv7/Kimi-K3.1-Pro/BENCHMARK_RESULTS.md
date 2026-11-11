@@ -4,11 +4,11 @@
 > Independent field validation of the public llm-d `kimi-k3-1` guide (SGLang on TorchTPU) on **Spot** Cloud TPU v7x capacity, run 2026-11-09/10. These are not official Google benchmarks. Spot preemptions limited the serving windows; numbers can differ on reserved capacity or newer images. Deployment guide: [README.md](README.md).
 
 > [!NOTE]
-> **Status (2026-11-10 16:00Z):** Stages 1A, 1B, 1C, 2A, 2B and 3 are **done and benchmarked**. **Stage 4/5 (full 93-layer model) has been served twice:**
-> - Attempt #4: `Ready` at 14:18Z, served for ~24 min.
-> - Attempt #6: two replicas `Ready` at 15:45Z and 15:46Z, served for ~8 min.
+> **Status (2026-11-11 14:10Z):** Stages 1A, 1B, 1C, 2A, 2B and 3 are **done and benchmarked**. **Stage 4/5 (full 93-layer model) is done:** it reached `Ready` on Spot `2x2x4` slices in attempts #4, #6, #8, #11, #18 and #21 (Section 5.3).
+> - Through the `llm-d` router it passed the G1–G4 validation gates and the 477K-token context check (G4X), and completed the throughput sweeps (Section 5.5).
+> - The adapted multi-turn `inference-perf` benchmark completed at C=8 (160 / 0) and C=16 (320 / 0, attempt #21) with ~90% prefix reuse. The guide's own `inference-perf` preset is not feasible on one replica (Section 5.6).
 >
-> Across those windows it passed the G1–G4 validation gates and the 477K-token context check (G4X) through the `llm-d` router, and completed most throughput sweeps (Section 5.5). The guide's `inference-perf` benchmark (G5B) needs a longer window: about 15–30 min of serving after a ~24–34 min startup, while most Spot slices live ~40 min. It, the shared-prefix and decode-heavy sweeps are queued and run automatically on the next slice. Section 5.3 covers the startup attempts, the shared compile-cache results and the Spot adaptation. Four separate single-host nodes can't stand in for a slice (Section 5.1). Stage 1C (Section 6) adds expanded single-host sweeps, llm-d routing A/B and `inference-perf` results on the 12-layer configuration.
+> Section 5.3 covers the startup attempts, the shared compile-cache results and the Spot adaptation. Four separate single-host nodes can't stand in for a slice (Section 5.1). Stage 1C (Section 6) adds expanded single-host sweeps, llm-d routing A/B and `inference-perf` results on the 12-layer configuration.
 
 ## 1. Environment & Stack Fingerprint
 
@@ -130,6 +130,14 @@ Spot granted a `2x2x4` slice (`tpu7x-2x2x4-spot-2`, 4 nodes Ready 10:10:40–10:
 | #5 | 14:38Z (pool `-1`) | — | — | Preempted at 14:42:23Z after ~4 min, during pod startup |
 | #6 | **15:11Z, two slices at once** (pools `-1` and `-2`, one replica each) | 572 s / 565 s (both replicas read the same volume at once) | **First run on the shared Tier-3 cache.** Prefill 167 s / 139 s (was 463 s). Decode buckets 110–163 s each (was 116–229 s). Total compile 1,048 s (was 1,541 s). | Replicas `Ready` at 15:44:50Z and 15:46:27Z (33.7 min after the grant). G4X done. Both slices preempted at 15:52:57Z (lifetime 41.9 min) |
 | #7 | 16:56Z (pool `-2`), first run with the Spot adaptation | 313 s (single replica) | — | Preempted at 17:05:41Z (~9 min), during the vision precompile |
+| **#8** | **18:18Z (pool `-2`)**, Spot adaptation + vision precompile skipped | 313 s | Prefill 132 s; decode 114–151 s per bucket; total compile 784 s | **`Ready` at 18:40:10Z, 21.7 min after the grant.** Served ~57 min (G5A3, G5C, G5A2X, G5BA, most of G5BA16); preempted at 19:37:40Z (lifetime 79 min) |
+| #9–#10 | 21:06Z and 21:57Z (pool `-1`, plus a second slice on pool `-2`) | — | — | All preempted within ~3–6 min of the grant |
+| #11 | 22:09Z (pool `-1`) | 308 s | decode 107–134 s per bucket | `Ready` at 22:30:48Z (21.2 min); preempted at 22:33:35Z, ~1 min into the G5BA16 rerun |
+| #12–#17 | Nov 11, 23:40Z–01:59Z (both pools; #16–#17 got both slices at once) | ~310–320 s when reached | prefill ~130 s when reached | All preempted 3–15 min after the grant, before `Ready` (#16 and #17 during the decode compile) |
+| #18 | 02:20Z (both pools) | ~320 s | decode 114–149 s per bucket | `Ready` at 02:41:56Z (21.7 min); both slices preempted ~30 s later. The runner started the benchmark against the dead server (0 of 320 OK); that result was discarded and the runner was fixed to require a successful warmup |
+| #19 | 12:13Z (pool `-2`) | — | decode bs=1 and bs=8 done | Preempted at 12:31Z (18 min), ~5 min before `Ready` |
+| #20 | 12:50Z (pool `-1`) | 323 s | prefill 131 s | **Not a Spot preemption:** GKE `AUTO_REPAIR_NODES` deleted all 4 slice VMs at 13:01:57Z (11.5 min), during the decode compile |
+| **#21** | **13:26Z, both pools** | 311 s | prefill 139 s; decode 109–149 s per bucket | Pool `-1` slice preempted after 2 min, while pods were starting. The group restarted on the idle pool `-2` slice at 13:30:37Z. **`Ready` at 13:51:51Z** (21.3 min after the restart); **G5BA16 completed** (320 / 0, Section 5.6) |
 
 > [!NOTE]
 > **Spot adaptation (from attempt #7 on, disclosed deviation):** Most slices lived ~40 min (40.0, 39.3, 33.7, 41.9, 41.9 min; one 62 min). A ~34 min startup leaves only a few minutes of serving. So, while no replica was running, the `LeaderWorkerSet` was changed in two ways:
@@ -243,14 +251,21 @@ A quick probe run first (G5Q: C=1/16/64, same workload) agreed within ~5%: 91.6 
 - The P99 TTFT (53 s) comes from the cold first turn of each session, a full ~20–70K-token prefill queued behind the others.
 - `inference-perf` reported 67 token-count mismatches between its tokenizer and the server; the 12-layer run had 66. This is a harness artifact with the custom Kimi tokenizer.
 
-**Adapted workload at C=16 (G5BA16; 320 requests, seed 43, same as the 12-layer C=16 run): cut short by the Spot preemption at 19:37:40Z.** 261 of 320 requests had completed; the 59 failures were in flight when the slice went away. Over the 261 successes:
-- Prompts: mean 38,580 · median 38,139 · max 79,405 tokens.
-- Prefix-cache reuse: **89.5%**.
-- TTFT: median **2.58 s** · P90 5.61 s · P99 75.0 s.
-- TPOT: median 57.6 ms · P90 100.9 ms.
-- Request latency: median 22.4 s.
-- Throughput: 17,227 input tok/s · 127.6 output tok/s · 0.45 req/s.
-- For reference, the 12-layer C=16 run (3 replicas) had a median TTFT of 244 ms and 1.62 req/s.
+**Adapted workload at C=16 (G5BA16; 320 requests, seed 43, same as the 12-layer C=16 run): completed in attempt #21** (2026-11-11, 13:53–14:06Z, Spot-adapted config; the leader stayed `Ready` throughout). The first try in attempt #8 was cut short at 261 of 320 requests by the 19:37:40Z preemption; this full run supersedes it.
+
+| Metric | **Full 93-layer model, 1 replica (16 chips)** | 12-layer model, dummy weights, 3 replicas (Section 6.5) |
+| --- | --- | --- |
+| Success / failures | **320 / 0** in 685 s | 320 / 0 in 197 s |
+| Prompt length per request | mean 38,739 · median 38,138 · P90 58,279 · max 79,403 | mean 38,755 · median 38,138 · P90 58,298 · max 79,420 |
+| **Prefix-cache reuse across turns** | **90.2%** (11.18M of 12.40M prompt tokens) | 90.0% |
+| TTFT | mean 4.35 s · **median 2.13 s** · P90 3.82 s · P99 73.8 s | mean 383 ms · median 244 ms · P90 462 ms · P99 4.06 s |
+| TPOT | mean 67.0 ms · median 51.4 ms · P90 77.1 ms | mean 5.41 ms · median 4.67 ms · P90 6.07 ms |
+| Request latency | mean 26.8 s · median 20.2 s · P90 48.1 s | mean 6.75 s · median 5.29 s · P90 12.56 s |
+| Throughput | **18,094 input tok/s** · 137 output tok/s · 0.47 req/s | 62,934 input tok/s · 483 output tok/s · 1.62 req/s |
+
+- **C=8 → C=16 on one replica:** throughput rose 19% (0.39 → 0.47 req/s; 16.4K → 18.1K input tok/s). Median TTFT went from 1.24 to 2.13 s and median TPOT from 35.6 to 51.4 ms. One replica is close to saturation at 16 sessions; the guide's 2-replica topology splits them.
+- Prefix reuse holds at ~90% with 16 sessions of ~39K tokens (~0.6M tokens of context, within the ~1.6M-token KV capacity).
+- As at C=8, the P99 TTFT (74 s) comes from each session's cold first turn (a full prefill of up to ~80K tokens) queued behind the others. `inference-perf` reported 147 token-count mismatches (harness artifact, as above).
 
 - Single-stream decode runs at **~120 tok/s (8.1 ms/token)** on the full 2.8T model.
 - With short (1,024-token) random prompts, throughput above C=1 is prefill-bound. The guide caps prefill at 4,096 tokens and 8 requests per batch, and each prefill batch stalls the running decodes, so TTFT and TPOT grow with concurrency. Long prompts prefill at ~4.4–4.6K tok/s in 4,096-token chunks (G4 increments; the G5B turn-0 prefills logged ~4.57K tok/s). The average rate drops to ~2.7K tok/s over a full 0→477K-token prompt.
@@ -355,7 +370,10 @@ Doubling the conversations nearly doubled throughput (1.62 vs 0.85 req/s) while 
 ## 7. Operational Findings (Spot TPU v7x on GKE)
 
 - **Single-host vs. slice:** a `2x2x1` node needs one free tray; a `2x2x4` slice needs 4 ICI-connected trays free at once, and GCE rolls back the whole slice if any one fails. On contended Spot capacity, single-host nodes come back within minutes, while slices landed only a handful of times overnight and were reclaimed whole (all 4 VMs within ~1 s).
-- **Scale-down locks don't stop Spot reclaim:** `scale-down-disabled`, autoscaling off, and fixed pool size keep GKE from removing nodes. Every node we lost was a GCE `compute.instances.preempted` event. A fixed-size MIG recreates preempted nodes automatically.
+- **Scale-down locks don't stop Spot reclaim:** `scale-down-disabled`, autoscaling off, and fixed pool size keep GKE from removing nodes. Every node we lost was a GCE `compute.instances.preempted` event, with one exception (next bullet). A fixed-size MIG recreates preempted nodes automatically.
+- **GKE auto-repair can remove a slice too:** in attempt #20, GKE's `AUTO_REPAIR_NODES` deleted all 4 VMs of a slice 11.5 min after the grant, with no Spot preemption recorded; we could not determine what triggered the repair. GKE then queued its own resize request to rebuild the slice.
+- **A hot-spare slice helps only sometimes:** with two slice pools armed and `replicas: 1`, the group lands on whichever slice comes up first. In attempt #21 the first slice was reclaimed after 2 min and the group restarted on the idle second slice ~1.5 min later, without waiting for a new grant; that window produced the full C=16 `inference-perf` result. In earlier attempts both slices were reclaimed together.
+- **Boot-disk quota can block slices:** a 4-VM `tpu7x` slice with 200 GB Hyperdisk Balanced boot disks needs 800 GB of regional `HDB_TOTAL_GB` quota. On a shared project this can fail slice creation or repair alongside stockouts; smaller boot disks or fewer idle nodes leave more room.
 - **Multi-host TPU pools can't be resized by hand:** GKE `setSize` returns `Multi-host TPU pool manual resize is not supported`, and the gang-mode MIG only resizes to 0. MIG `resize-requests` work for queuing a 4-VM slice.
 - **Persistent compile cache matters on Spot:** with the Tier-3 cache on GCS FUSE, a preempted 12-layer replica comes back in ~8 min instead of ~11+ min. For the full model (~38 min uncached startup vs. 34–62 min slice lifetimes), the cache decides whether a slice ever serves.
 - **Share one compile-cache directory across ranks:** the cache key includes the node-normalized rank and `rank_to_device`, and node normalization assigns ranks per slice. Per-pod directories (keyed by LWS worker index) missed on every new slice. Object names are content keys, so one shared directory is safe.
